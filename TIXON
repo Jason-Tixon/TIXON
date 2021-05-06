@@ -1,0 +1,411 @@
+//版权所有（c）2010中本聪
+//版权所有（c）2009-2014比特币开发人员
+//版权所有（c）2014-2015 The Dash开发人员
+//版权所有（c）2015-2017 PIVX开发人员
+//版权所有（c）2017-2018 Tixoncash开发人员
+//根据MIT软件许可分发，请参阅随附的
+//文件COPYING或http://www.opensource.org/licenses/mit-license.php。
+
+＃包含 “ chainparams.h ”
+＃包含 “ random.h ”
+＃包括 “ util.h ”
+＃包括 “ utilstrencodings.h ”
+
+＃包括 < ASSERT.H >
+
+＃包括 < boost / assign / list_of.hpp >
+
+使用 名称空间 std ;
+使用 命名空间 boost :: assign ;
+
+struct  SeedSpec6 {
+    uint8_t addr [ 16 ];
+    uint16_t端口；
+};
+
+＃包含 “ chainparamsseeds.h ”
+
+/ * *
+ *主网
+ * /
+
+//！将pnSeeds6数组转换为可用的地址对象。
+静态 void  convertSeed6（std :: vector <CAddress>＆vSeedsOut，const SeedSpec6 *数据，无符号 整数计数）
+{
+    //它只会连接到一个或两个种子节点，因为一旦连接，
+    //它会获得一堆带有新时间戳的地址。
+    //种子节点的随机“上次看到时间”为一到两个
+    //几周前。
+    const  int64_t nOneWeek = 7 * 24 * 60 * 60 ;
+    for（unsigned  int i = 0 ; i <count; i ++）{
+        struct  in6_addr ip;
+        memcpy（＆ip，data [i] 。addr，sizeof（ip））;
+        CAddress地址（内部CService（IP，数据[i]中。端口））;
+        地址。nTime = GetTime（）- GetRand（nOneWeek）-nOneWeek;
+        vSeedsOut。push_back（addr）;
+    }
+}
+
+//   是什么使一个好的检查点块变得更好？
+// +被带有合理时间戳的块包围
+//    （之前没有块，之后没有时间戳，之后没有时间戳
+//    之前的时间戳记）
+// +不包含任何奇怪的交易
+静态Checkpoints :: MapCheckpoints mapCheckpoints =
+    boost :: assign :: map_list_of
+    （0，uint256（“ 0x4c000f530eae927060901517a790b0ff42abc65d8e8e7e07e651f9709824f6ff ”））；
+
+静态 const Checkpoints :: CCheckpointData数据= {
+    ＆mapCheckpoints，
+    1543052277，// *最后一个检查点块的UNIX时间戳
+    2，           // *成因与最后一个检查点之间的事务总数
+                //    （SetBestChain debug.log行中的tx = ...数字）
+    2000         // *检查点之后每天的估计交易数
+};
+
+静态Checkpoints :: MapCheckpoints mapCheckpointsTestnet =
+    boost :: assign :: map_list_of（0，uint256（“ 0x001 ”））;
+
+静态 const Checkpoints :: CCheckpointData dataTestnet = {
+    ＆mapCheckpointsTestnet，
+    1740710，
+    0，
+    250 };
+
+静态Checkpoints :: MapCheckpoints mapCheckpointsRegtest =
+    boost :: assign :: map_list_of（0，uint256（“ 0x001 ”））;
+静态 const Checkpoints :: CCheckpointData dataRegtest = {
+    ＆mapCheckpointsRegtest，
+    1454124731，
+    0，
+    100 };
+
+ CMainParams类：公共 CChainParams
+{
+上市：
+    CMainParams（）
+    {
+        networkID = CBaseChainParams :: MAIN;
+        strNetworkID = “ main ” ;
+        / * *
+         *消息起始字符串被设计为不可能在普通数据中出现。
+         *字符很少使用高位ASCII，无效为UTF-8，并产生
+         *任何对齐方式都为4字节大int。
+         * /
+        pchMessageStart [ 0 ] = 0xb6 ;
+        pchMessageStart [ 1 ] = 0xb3 ;
+        pchMessageStart [ 2 ] = 0xdd ;
+        pchMessageStart [ 3 ] = 0x8d ;
+        vAlertPubKey = ParseHex（“ 04d2df519f53e2eaa4a7d7ff3347a360520c2f4b8f07d0241b5b6ba5ce8e3d6ecba5443696473a387adff27aa6bb72b952ff23026e088cff9f47cbb387ed52c326 ”；
+        nDefaultPort = 9433 ;
+        bnProofOfWorkLimit = 〜uint256（0）>> 1 ;
+        nSubsidyHalvingInterval = 1050000 ;
+        nMaxReorganizationDepth = 100 ;
+        nEnforceBlockUpgradeMajority = 750 ;
+        nRejectBlockOutdatedMajority = 950 ;
+        nToCheckBlockUpgradeMajority = 1000 ;
+        nMinerThreads = 0 ;
+        nTargetTimespan = 1 * 30 ; // Tixoncash：1天
+        nTargetSpacing = 1 * 60 ;  // Tixoncash：2分钟
+        nMaturity = 10；
+        nMasternodeCountDrift = 20 ;
+        nMaxMoneyOut = 92000000000 *硬币;
+
+        / * *基于高度或时间的激活* * /
+        nLastPOWBlock = 200 ;
+        nModifierUpdateBlock = 1 ; //我们将版本2用于TXCH
+
+        / * *
+         *建立创世纪块。注意创世币库的输出不能
+         *花费，因为它最初不存在于数据库中。
+         *
+         * python〜/ genesis.py -a quark-hash -z“即使有能源盈余，加拿大也无法满足比特币矿工的用电需求” -t 1516926684 -v 0 -p 04e5a8143f86ad8ac63791fbbdb8e0b91a8da88c8c693a95a6e23e6b3e1e1e1e1e1e1e1e1e0b0e0b0e0b0e0e0b0e0e0e0e0e0e0b0e0e0b0b0e
+         * 04ffff001d01042642544320426c6f636b20353031353932202d20323031372d31322d32392031353a34333a3337
+         *算法：夸克哈希
+         *梅克尔哈希：07cbcacfc822fba6bbeb05312258fa43b96a68fc310af8dfcec604591763f7cf
+         * pszTimestamp：即使能源过剩，加拿大也无法满足比特币矿工的电力需求
+         *公开密钥：04e5a8143f86ad8ac63791fbbdb8e0b91a8da88c8c693a95f6c2c13c063ea790f7960b8025a9047a7bc671d5cfe707a2dd2e13b86182e1064a0eea7bf863636363
+         *时间：1516926684
+         *位：0x1e0ffff0
+         *搜索创世哈希。
+         * 16525.0哈希/秒，估计：找到72.2个遗传哈希！
+         *随机数：21256609
+         * genesis_hash：000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b
+         * /
+        const  char * pszTimestamp = “即使能源过剩，加拿大也无法满足比特币矿工的电力需求”；
+        CMutableTransaction txNew;
+        txNew。vin。调整大小（1）;
+        txNew。vout。调整大小（1）;
+        txNew。vin [ 0 ]。scriptSig = CScript（）<< 486604799 << CScriptNum（4）<< vector < unsigned  char >（（const  unsigned  char *）pszTimestamp，（const  unsigned  char *）pszTimestamp + strlen（pszTimestamp））;
+        txNew。vout [ 0 ]。nValue = 0 *硬币;
+        txNew。vout [ 0 ]。scriptPubKey =的CScript（）<< ParseHex（“ 04e5a8143f86ad8ac63791fbbdb8e0b91a8da88c8c693a95f6c2c13c063ea790f7960b8025a9047a7bc671d5cfe707a2dd2e13b86182e1064a0eea7bf863636363 ”）<< OP_CHECKSIG;
+        成因。vtx。push_back（txNew）;
+        成因。hashPrevBlock = 0 ;
+        成因。hashMerkleRoot =起源。BuildMerkleTree（）;
+        成因。nVersion = 1 ;
+        成因。nTime = 1516926684 ;
+        成因。nBits = 0x1e0ffff0 ;
+        成因。nNonce = 860312；
+ 
+        hashGenesisBlock =起源。GetHash（）;
+        断言（hashGenesisBlock == uint256（“ 0x00000dfecf20a0e97ee2a6a6f9ed54121c81325ed28cb367f74a641212df1620 ”））；
+        断言（genesis。hashMerkleRoot == uint256（“ 0x07cbcacfc822fba6bbeb05312258fa43b96a68fc310af8dfcec604591763f7cf ”））；
+
+        // DNS播种
+        vSeeds。push_back（CDNSSeedData（“ 128.199.61.189 ”，“ 128.199.61.189 ”））;
+        vSeeds。push_back（CDNSSeedData（“ 188.166.96.226 ”，“ 188.166.96.226 ”））;
+        vSeeds。push_back（CDNSSeedData（“ 188.166.120.17 ”，“ 188.166.120.17 ”））;
+        vSeeds。push_back（CDNSSeedData（“ 188.166.127.127 ”，“ 188.166.127.127 ”））;
+        vSeeds。push_back（CDNSSeedData（“ 128.199.48.70 ”，“ 128.199.48.70 ”））;
+        vSeeds。push_back（CDNSSeedData（“ 178.62.196.147 ”，“ 178.62.196.147 ”））;
+        vSeeds。push_back（CDNSSeedData（“ 178.62.232.19 ”，“ 178.62.232.19 ”））;
+        vSeeds。push_back（CDNSSeedData（“ 128.199.45.156 ”，“ 128.199.45.156 ”））;
+        vSeeds。push_back（CDNSSeedData（“ 188.166.50.176 ”，“ 188.166.50.176 ”））;
+        
+
+        // Tixoncash地址以'G'开头
+        base58Prefixes [PUBKEY_ADDRESS] =标准::矢量<无符号 字符>（1，38）;
+        // Tixoncash脚本地址以“ 3”开头
+        base58Prefixes [SCRIPT_ADDRESS] =标准::矢量<无符号 字符>（1，6）;
+        // Tixoncash私钥以“ K”开头
+        base58Prefixes [SECRET_KEY] =标准::矢量<无符号 字符>（1，46）;
+        // Tixoncash BIP32公开密钥以'xpub'开头（默认为比特币）
+        base58Prefixes [EXT_PUBLIC_KEY] = boost :: assign :: list_of（0x04）（0x88）（0xB2）（0x1E）。convert_to_container <std :: vector <无符号 字符>>（）;
+        // Tixoncash BIP32 prvkeys以'xprv'开头（比特币默认值）
+        base58Prefixes [EXT_SECRET_KEY] = boost :: assign :: list_of（0x04）（0x88）（0xAD）（0xE4）。convert_to_container <std :: vector <无符号 字符>>（）;
+        // Tixoncash BIP44硬币类型为'222'（0x800000de）
+        // BIP44硬币类型来自https://github.com/satoshilabs/slips/blob/master/slip-0044.md
+        base58Prefixes [EXT_COIN_TYPE] = boost :: assign :: list_of（0x80）（0x00）（0x00）（0xde）。convert_to_container <std :: vector <无符号 字符>>（）;
+
+        convertSeed6（vFixedSeeds，pnSeed6_main，ARRAYLEN（pnSeed6_main））;
+
+        fMiningRequiresPeers = true ;
+        fAllowMinDifficultyBlocks = false ;
+        fDefaultConsistencyChecks = false ;
+        fRequireStandard = true ;
+        fMineBlocksOnDemand = false ;
+        fSkipProofOfWorkCheck = false ;
+        fTestnetToBeDeprecatedFieldRPC = false ;
+        fHeadersFirstSyncingActive = false ;
+
+        nPoolMaxTransactions = 3 ;
+        strSporkKey = “ 04026c33ff67ad40db68e7ba4f6d858a56550a7aba460857d1cf0f34af4e7d090b255928df8135ee5343df02b88801635ef054da6ef3071ce69c2c3134acad54e9 ” ;
+        strMasternodePoolDummyAddress = “ GSJVWUkt6HtSCY2SaJ2akeyJUg8bg1hW3S ” ;
+        nStartMasternodePayments =起源。nTime + 86400；//创世后24小时
+
+        nBudget_Fee_Confirmations = 6 ; //敲定费的确认数
+    }
+
+    const Checkpoints :: CCheckpointData＆Checkpoints（）const
+    {
+        返回数据；
+    }
+};
+静态CMainParams mainParams;
+
+/ * *
+ *测试网（v3）
+ * /
+ CTestNetParams类：公共 CMainParams
+{
+上市：
+    CTestNetParams（）
+    {
+        networkID = CBaseChainParams :: TESTNET;
+        strNetworkID = “测试” ;
+        pchMessageStart [ 0 ] = 0x4a ;
+        pchMessageStart [ 1 ] = 0x2d ;
+        pchMessageStart [ 2 ] = 0x32 ;
+        pchMessageStart [ 3 ] = 0xbc ;
+        vAlertPubKey = ParseHex（“ 04ba89975265af1d4c6295d3587eb4a0e4b758bde1621ef2ab8f92b98e7ed1c85547c9b7a3f145a66aa2abb91db5c13295828e77d823ea6d9b4bb89912425e1efe ”）;
+        nDefaultPort = 19433 ;
+        nEnforceBlockUpgradeMajority = 51 ;
+        nRejectBlockOutdatedMajority = 75 ;
+        nToCheckBlockUpgradeMajority = 100 ;
+        nMinerThreads = 0 ;
+        nTargetTimespan = 1 * 60 ; // Tixoncash：1天
+        nTargetSpacing = 2 * 60 ;  // Tixoncash：1分钟
+        nLastPOWBlock = 200 ;
+        nMaturity = 15；
+        nMasternodeCountDrift = 4 ;
+        nModifierUpdateBlock = 1 ;
+        nMaxMoneyOut = 21000000 *硬币;
+
+        //！修改testnet的创世块，以便时间戳在以后的启动中有效。
+        成因。nTime = 1516926684 ;
+        成因。nNonce = 21256609 ;
+
+        hashGenesisBlock =起源。GetHash（）;
+        断言（hashGenesisBlock == uint256（“ 0x000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b ”）））；
+
+        vFixedSeeds。清除（）;
+        vSeeds。清除（）;
+
+        // Testnet Tixoncash地址以'g'开头
+        base58Prefixes [PUBKEY_ADDRESS] =标准::矢量<无符号 字符>（1，98）;
+        // Testnet Tixoncash脚本地址以“ 5”或“ 6”开头
+        base58Prefixes [SCRIPT_ADDRESS] =标准::矢量<无符号 字符>（1，12）;
+        // Testnet私钥以'k'开头
+        base58Prefixes [SECRET_KEY] =标准::矢量<无符号 字符>（1，108）;
+        // Testnet Tixoncash BIP32 pubkey以'tpub'开头（默认为比特币）
+        base58Prefixes [EXT_PUBLIC_KEY] = boost :: assign :: list_of（0x04）（0x35）（0x87）（0xCF）。convert_to_container <std :: vector <无符号 字符>>（）;
+        // Testnet Tixoncash BIP32 prvkeys以'tprv'开头（比特币默认值）
+        base58Prefixes [EXT_SECRET_KEY] = boost :: assign :: list_of（0x04）（0x35）（0x83）（0x94）。convert_to_container <std :: vector <无符号 字符>>（）;
+        // Testnet比特币绿色BIP44硬币类型为“ 1”（所有硬币的testnet默认值）
+        base58Prefixes [EXT_COIN_TYPE] = boost :: assign :: list_of（0x80）（0x00）（0x00）（0x01）。convert_to_container <std :: vector <无符号 字符>>（）;
+
+        convertSeed6（vFixedSeeds，pnSeed6_test，ARRAYLEN（pnSeed6_test））;
+
+        fMiningRequiresPeers = true ;
+        fAllowMinDifficultyBlocks = false ;
+        fDefaultConsistencyChecks = false ;
+        fRequireStandard = false ;
+        fMineBlocksOnDemand = false ;
+        fTestnetToBeDeprecatedFieldRPC = true ;
+
+        nPoolMaxTransactions = 2 ;
+        strSporkKey = “ 041bab97de321ccf1e78d10164f90bd87e3070ddb5586389013e9f15c4931e2451f318f1a8f177c5e9a3f5b4b13145f78e8116d2aa7ae14ef27f1f076b02ba852c ” ;
+        strMasternodePoolDummyAddress = “ gbJ4Qad4xc77PpLzMx6rUegAs6aUPWkcUq ”；
+        nStartMasternodePayments =起源。nTime + 86400；//创世后24小时
+        nBudget_Fee_Confirmations = 3 ; //敲定费的确认数。我们必须做的很短
+                                       //这里，因为我们在testnet上只有8个块的最终确定窗口
+    }
+    const Checkpoints :: CCheckpointData＆Checkpoints（）const
+    {
+        返回dataTestnet;
+    }
+};
+静态CTestNetParams testNetParams;
+
+/ * *
+ * 回归测试
+ * /
+ CRegTestParams类：公共 CTestNetParams
+{
+上市：
+    CRegTestParams（）
+    {
+        networkID = CBaseChainParams :: REGTEST;
+        strNetworkID = “ regtest ” ;
+        strNetworkID = “ regtest ” ;
+        pchMessageStart [ 0 ] = 0x20 ;
+        pchMessageStart [ 1 ] = 0xee ;
+        pchMessageStart [ 2 ] = 0x32 ;
+        pchMessageStart [ 3 ] = 0xbc ;
+        nSubsidyHalvingInterval = 150 ;
+        nEnforceBlockUpgradeMajority = 750 ;
+        nRejectBlockOutdatedMajority = 950 ;
+        nToCheckBlockUpgradeMajority = 1000 ;
+        nMinerThreads = 1 ;
+        nTargetTimespan = 24 * 60 * 60 ; // Tixoncash：1天
+        nTargetSpacing = 2 * 60 ;        // Tixoncash：1分钟
+        bnProofOfWorkLimit = 〜uint256（0）>> 1 ;
+        成因。nTime = 1516926684 ;
+        成因。nBits = 0x207fffff ;
+        成因。nNonce = 20542300 ;
+
+        hashGenesisBlock =起源。GetHash（）;
+        nDefaultPort = 29433 ;
+        断言（hashGenesisBlock == uint256（“ 0x229874aa8a92df3347600978e226ba57bc994b9fa291ea50519afafca2d50ed3 ”））；
+
+        vFixedSeeds。清除（）; //！Regtest模式没有任何固定的种子。
+        vSeeds。清除（）;      //！Regtest模式没有任何DNS种子。
+
+        fMiningRequiresPeers = false ;
+        fAllowMinDifficultyBlocks = true ;
+        fDefaultConsistencyChecks = true ;
+        fRequireStandard = false ;
+        fMineBlocksOnDemand = true ;
+        fTestnetToBeDeprecatedFieldRPC = false ;
+    }
+    const Checkpoints :: CCheckpointData＆Checkpoints（）const
+    {
+        返回dataRegtest;
+    }
+};
+静态CRegTestParams regTestParams;
+
+/ * *
+ * 单元测试
+ * /
+类 CUnitTestParams：公共 CMainParams，公共 CModifiableParams
+{
+上市：
+    CUnitTestParams（）
+    {
+        networkID = CBaseChainParams :: UNITTEST;
+        strNetworkID = “ unittest ” ;
+        nDefaultPort = 51478 ;
+        vFixedSeeds。清除（）; //！单元测试模式没有任何固定的种子。
+        vSeeds。清除（）;      //！单元测试模式没有任何DNS种子。
+
+        fMiningRequiresPeers = false ;
+        fDefaultConsistencyChecks = true ;
+        fAllowMinDifficultyBlocks = false ;
+        fMineBlocksOnDemand = true ;
+    }
+
+    const Checkpoints :: CCheckpointData＆Checkpoints（）const
+    {
+        // UnitTest与MAIN共享相同的检查点
+        返回数据；
+    }
+
+    //！已发布的设置器，允许在单元测试用例中更改值
+    虚拟 虚空 setSubsidyHalvingInterval（int anSubsidyHalvingInterval）{nSubsidyHalvingInterval = anSubsidyHalvingInterval; }
+    虚拟 虚空 setEnforceBlockUpgradeMajority（int anEnforceBlockUpgradeMajority）{nEnforceBlockUpgradeMajority = anEnforceBlockUpgradeMajority; }
+    虚拟 虚空 setRejectBlockOutdatedMajority（int anRejectBlockOutdatedMajority）{nRejectBlockOutdatedMajority = anRejectBlockOutdatedMajority; }
+    虚拟 空隙 setToCheckBlockUpgradeMajority（INT anToCheckBlockUpgradeMajority）{nToCheckBlockUpgradeMajority = anToCheckBlockUpgradeMajority; }
+    虚拟 void  setDefaultConsistencyChecks（bool afDefaultConsistencyChecks）{ fDefaultConsistencyChecks = afDefaultConsistencyChecks; }
+    虚拟 虚空 setAllowMinDifficultyBlocks（bool afAllowMinDifficultyBlocks）{ fAllowMinDifficultyBlocks = afAllowMinDifficultyBlocks; }
+    虚拟 虚空 setSkipProofOfWorkCheck（bool afSkipProofOfWorkCheck）{ fSkipProofOfWorkCheck = afSkipProofOfWorkCheck; }
+};
+静态CUnitTestParams unitTestParams;
+
+
+静态CChainParams * pCurrentParams = 0 ;
+
+CModifiableParams * ModifiableParams（）
+{
+    断言（pCurrentParams）;
+    断言（pCurrentParams ==＆unitTestParams）;
+    return（CModifiableParams *）＆unitTestParams;
+}
+
+const CChainParams＆Params（）
+{
+    断言（pCurrentParams）;
+    返回* pCurrentParams;
+}
+
+CChainParams和参数（CBaseChainParams :: Network网络）
+{
+    交换机（网络）{
+    案例CBaseChainParams :: MAIN：
+        返回mainParams;
+    案例CBaseChainParams :: TESTNET：
+        返回testNetParams;
+    案例CBaseChainParams :: REGTEST：
+        返回regTestParams;
+    案例CBaseChainParams :: UNITTEST：
+        返回unitTestParams;
+    默认值：
+        断言（false && “未实现的网络”）；
+        返回mainParams;
+    }
+}
+
+无效的 SelectParams（CBaseChainParams :: Network网络）
+{
+    SelectBaseParams（网络）；
+    pCurrentParams =＆参数（网络）;
+}
+
+bool  SelectParamsFromCommandLine（）
+{
+    CBaseChainParams :: Network网络= NetworkIdFromCommandLine（）;
+    如果（网络== CBaseChainParams :: MAX_NETWORK_TYPES）
+        返回 false ;
+
+    SelectParams（网络）；
+    返回 true ;
