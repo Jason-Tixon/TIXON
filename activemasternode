@@ -1,0 +1,432 @@
+//版权所有 (c) 2014-2016 The Dash 开发人员
+//版权所有 (c) 2015-2017 PIVX 开发人员
+//版权所有 (c) 2017-2018 The Tixoncash 开发人员
+//版权所有 (c) 2019-2021 Jason
+//在 MIT/X11 软件许可下分发，见随附
+//复制文件或 http://www.opensource.org/licenses/mit-license.php。
+
+#包含 “ activemasternode.h ”
+#包含 “ addrman.h ”
+#包含 “ masternode.h ”
+#包含 “ masternodeconfig.h ”
+#包含 “ masternodeman.h ”
+#包含 “ masternode-helpers.h ”
+#包含 “协议.h ”
+#包括 “ spork.h ”
+
+//跟踪活跃的主节点
+CActiveMasternode activeMasternode;
+
+//
+//启动主节点，寻找 TXCH 抵押品输入并在网络上注册
+//
+void  CActiveMasternode::ManageStatus ()
+{
+    std::string errorMessage;
+
+    如果（！fMasterNode）返回；
+
+    if ( fDebug ) LogPrintf ( " CActiveMasternode::ManageStatus() - Begin \n " );
+
+    //需要正确的块来发送 ping
+    if ( Params (). NetworkID ()!=CBaseChainParams::REGTEST && ! masternodeSync.IsBlockchainSynced ()){
+        状态 = ACTIVE_MASTERNODE_SYNC_IN_PROCESS;
+        LogPrintf ( " CActiveMasternode::ManageStatus() - %s \n " , GetStatus ());
+        返回;
+    }
+
+    如果（状态== ACTIVE_MASTERNODE_SYNC_IN_PROCESS）状态= ACTIVE_MASTERNODE_INITIAL;
+
+    如果（状态 == ACTIVE_MASTERNODE_INITIAL）{
+        CMasternode* pmn;
+        pmn = mnodeman。查找（pubKeyMasternode）；
+        如果（下午！= NULL）{
+            pmn->检查();
+            if (pmn-> IsEnabled () && pmn-> protocolVersion == PROTOCOL_VERSION) EnableHotColdMasterNode (pmn-> vin , pmn-> addr );
+        }
+    }
+
+    如果（状态！= ACTIVE_MASTERNODE_STARTED）{
+        //设置默认值
+        状态 = ACTIVE_MASTERNODE_NOT_CAPABLE;
+        notCapableReason = " " ;
+
+        if (pwalletMain-> IsLocked ()) {
+            notCapableReason = "钱包被锁定。" ;
+            LogPrintf ( " CActiveMasternode::ManageStatus() - 不能：%s \n " , notCapableReason);
+            返回;
+        }
+
+        if (pwalletMain-> GetBalance () == 0 ) {
+            notCapableReason = "热点节点，等待远程激活。" ;
+            LogPrintf ( " CActiveMasternode::ManageStatus() - 不能：%s \n " , notCapableReason);
+            返回;
+        }
+
+        如果（strMasterNodeAddr。清空（））{
+            如果（！GetLocal（服务））{
+                notCapableReason = "无法检测到外部地址。请使用 masternodeaddr 配置选项。" ;
+                LogPrintf ( " CActiveMasternode::ManageStatus() - 不能：%s \n " , notCapableReason);
+                返回;
+            }
+        }其他{
+            服务 = CService (strMasterNodeAddr);
+        }
+
+        // if (Params().NetworkID() == CBaseChainParams::MAIN) {
+        //     如果 (service.GetPort() != 9433) {
+        //          notCapableReason = strprintf("无效端口：%u - 主网上仅支持 9433。", service.GetPort());
+        //          LogPrintf("CActiveMasternode::ManageStatus() - 不能：%s\n", notCapableReason);
+        //         返回；
+        //      }
+        // } else if (service.GetPort() == 9433) {
+        //      notCapableReason = strprintf("无效端口：%u - 9433 仅在主网上支持。", service.GetPort());
+        //      LogPrintf("CActiveMasternode::ManageStatus() - 不能：%s\n", notCapableReason);
+        //     返回；
+        // }
+
+        LogPrintf（“ CActiveMasternode :: ManageStatus（） -检查到'％s'的入站连接\ n ”，服务。的ToString（））;
+
+        CNode* pnode = ConnectNode ((CAddress)service, NULL );
+        如果（！pnode）{
+            notCapableReason = "无法连接到" + 服务。ToString ();
+            LogPrintf ( " CActiveMasternode::ManageStatus() - 不能：%s \n " , notCapableReason);
+            返回;
+        }
+        pnode->释放();
+
+        //选择要使用的硬币
+        CPubKey pubKeyCollat​​eralAddress;
+        CKey keyCollat​​eralAddress;
+
+        如果（GetMasterNodeVin（vin，pubKeyCollat​​eralAddress，keyCollat​​eralAddress））{
+            if ( GetInputAge (vin) < MASTERNODE_MIN_CONFIRMATIONS) {
+                状态 = ACTIVE_MASTERNODE_INPUT_TOO_NEW;
+                notCapableReason = strprintf（“ %s - %d 确认”，GetStatus（），GetInputAge（vin））；
+                LogPrintf ( " CActiveMasternode::ManageStatus() - %s \n " , notCapableReason);
+                返回;
+            }
+
+            锁定(pwalletMain-> cs_wallet );
+            pwalletMain-> LockCoin (vin. prevout );
+
+            //发送到所有节点
+            CPubKey pubKeyMasternode;
+            CKey keyMasternode;
+
+            如果（！masternodeSigner。setkey的（strMasterNodePrivKey，的errorMessage，keyMasternode，pubKeyMasternode））{
+                notCapableReason = "调用 SetKey 时出错：" + errorMessage;
+                LogPrintf ( " Register::ManageStatus() - %s \n " , notCapableReason);
+                返回;
+            }
+
+            如果（！注册（vin，服务，keyCollat​​eralAddress，pubKeyCollat​​eralAddress，keyMasternode，pubKeyMasternode，errorMessage））{
+                notCapableReason = "注册错误：" + errorMessage;
+                LogPrintf ( " Register::ManageStatus() - %s \n " , notCapableReason);
+                返回;
+            }
+
+            LogPrintf ( " CActiveMasternode::ManageStatus() - 有能力的主节点！\n " );
+            状态 = ACTIVE_MASTERNODE_STARTED;
+
+            返回;
+        }其他{
+            notCapableReason = "找不到合适的硬币！" ;
+            LogPrintf ( " CActiveMasternode::ManageStatus() - %s \n " , notCapableReason);
+            返回;
+        }
+    }
+
+    //发送给所有节点
+    if (! SendMasternodePing (errorMessage)) {
+        LogPrintf ( " CActiveMasternode::ManageStatus() - ping 错误：%s \n " , errorMessage);
+    }
+}
+
+std::string CActiveMasternode::GetStatus ()
+{
+    开关（状态）{
+    案例ACTIVE_MASTERNODE_INITIAL：
+        返回 “节点刚刚启动，尚未激活”；
+    案例ACTIVE_MASTERNODE_SYNC_IN_PROCESS：
+        return  "同步进行中。必须等到同步完成才能启动主节点" ;
+    案例ACTIVE_MASTERNODE_INPUT_TOO_NEW：
+        return  strprintf ( “主节点输入必须至少有 %d 个确认”，MASTERNODE_MIN_CONFIRMATIONS);
+    案例ACTIVE_MASTERNODE_NOT_CAPABLE：
+        返回 “没有能力的主节点：” + notCapableReason;
+    案例ACTIVE_MASTERNODE_STARTED：
+        返回 “主节点成功启动”；
+    默认：
+        返回 “未知”；
+    }
+}
+
+bool  CActiveMasternode::SendMasternodePing (std::string& errorMessage)
+{
+    如果（状态！= ACTIVE_MASTERNODE_STARTED）{
+        errorMessage = "主节点不在运行状态" ;
+        返回 假；
+    }
+
+    CPubKey pubKeyMasternode;
+    CKey keyMasternode;
+
+    如果（！masternodeSigner。setkey的（strMasterNodePrivKey，的errorMessage，keyMasternode，pubKeyMasternode））{
+        errorMessage = strprintf ( "调用 SetKey 时出错: %s \n " , errorMessage);
+        返回 假；
+    }
+
+    LogPrintf（“ CActiveMasternode :: SendMasternodePing（） -继电器Masternode平VIN =％S \ n ”，VIN的ToString（））;
+
+    CMasternodePing mnp (vin);
+    如果（！MNP。注册（keyMasternode，pubKeyMasternode））{
+        errorMessage = "无法签署 Masternode Ping " ;
+        返回 假；
+    }
+
+    //在主节点列表中为我们的主节点更新 lastPing
+    CMasternode* pmn = mnodeman. 查找(vin);
+    如果（下午！= NULL）{
+        if (pmn-> IsPingedWithin (MASTERNODE_PING_SECONDS, mnp.sigTime )) {
+            errorMessage = "太早发送主节点 Ping " ;
+            返回 假；
+        }
+
+        pmn-> lastPing = mnp;
+        管理人。mapSeenMasternodePing。插入（make_pair（MNP。GetHash（），MNP））;
+
+        // mnodeman.mapSeenMasternodeBroadcast.lastPing 可能已经过时，所以我们会更新它
+        CMasternodeBroadcast mnb (*pmn);
+        uint256 哈希 = mnb。获取哈希();
+        如果（mnodeman。mapSeenMasternodeBroadcast。计数（哈希））mnodeman。mapSeenMasternodeBroadcast [哈希]。lastPing = mnp;
+
+        mnp。继电器();
+
+        返回 真；
+    }其他{
+        //似乎我们正在尝试在主节点未在网络中注册时发送 ping
+        errorMessage = " Masternode List 不包含我们的Masternode，关闭Masternode ping服务！" + vin. ToString ();
+        状态 = ACTIVE_MASTERNODE_NOT_CAPABLE;
+        notCapableReason = 错误消息；
+        返回 假；
+    }
+}
+
+bool  CActiveMasternode::Register (std::string strService, std::string strKeyMasternode, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage)
+{
+    CTxIn vin;
+    CPubKey pubKeyCollat​​eralAddress;
+    CKey keyCollat​​eralAddress;
+    CPubKey pubKeyMasternode;
+    CKey keyMasternode;
+
+    //需要正确的块来发送 ping
+    如果（！masternodeSync。IsBlockchainSynced（））{
+        errorMessage = GetStatus ();
+        LogPrintf ( " CActiveMasternode::Register() - %s \n " , errorMessage);
+        返回 假；
+    }
+
+    如果（！masternodeSigner。setkey的（strKeyMasternode，的errorMessage，keyMasternode，pubKeyMasternode））{
+        errorMessage = strprintf ( “找不到主节点 %s - %s 的密钥” , strService, errorMessage);
+        LogPrintf ( " CActiveMasternode::Register() - %s \n " , errorMessage);
+        返回 假；
+    }
+
+    if (! GetMasterNodeVin (vin, pubKeyCollat​​eralAddress, keyCollat​​eralAddress, strTxHash, strOutputIndex)) {
+        errorMessage = strprintf ( “无法为主节点 %s 分配 vin %s:%s ” , strTxHash, strOutputIndex, strService);
+        LogPrintf ( " CActiveMasternode::Register() - %s \n " , errorMessage);
+        返回 假；
+    }
+
+    // CService 服务 = CService(strService);
+    // if (Params().NetworkID() == CBaseChainParams::MAIN) {
+    //     如果 (service.GetPort() != 9433) {
+    //          errorMessage = strprintf("主节点 %s 的无效端口 %u - 主网上仅支持 9433。", service.GetPort(), strService);
+    //          LogPrintf("CActiveMasternode::Register() - %s\n", errorMessage);
+    //         返回假；
+    //      }
+    // } else if (service.GetPort() == 9433) {
+    //      errorMessage = strprintf("主节点 %s 的无效端口 %u - 9433 仅在主网上支持。", service.GetPort(), strService);
+    //      LogPrintf("CActiveMasternode::Register() - %s\n", errorMessage);
+    //     返回假；
+    // }
+
+    地址 添加（CAddress（服务），CNetAddr（“ 127.0.0.1 ”），2 * 60 * 60）；
+
+    返回 注册（vin，CService（strService），keyCollat​​eralAddress，pubKeyCollat​​eralAddress，keyMasternode，pubKeyMasternode，errorMessage）；
+}
+
+bool  CActiveMasternode::Register (CTxIn vin, CService 服务, CKey keyCollat​​eralAddress, CPubKey pubKeyCollat​​eralAddress, CKey keyMasternode, CPubKey pubKeyMasternode, std::string& errorMessage)
+{
+    CMasternodeBroadcast mnb;
+    CMasternodePing mnp (vin);
+    如果（！MNP。注册（keyMasternode，pubKeyMasternode））{
+        的errorMessage = strprintf（“失败标志平，VIN：％S ”，VIN的ToString（））;
+        LogPrintf ( " CActiveMasternode::Register() - %s \n " , errorMessage);
+        返回 假；
+    }
+    管理人。mapSeenMasternodePing。插入（make_pair（MNP。GetHash（），MNP））;
+
+    LogPrintf（“ CActiveMasternode ::寄存器（） -添加到列表Masternode \ n    服务：％S \ n     VIN：％S \ n ”，服务。的ToString（），VIN。的ToString（））;
+    mnb = CMasternodeBroadcast（服务，vin，pubKeyCollat​​eralAddress，pubKeyMasternode，PROTOCOL_VERSION）；
+    mnb。lastPing = mnp;
+    如果（！MNB。注册（keyCollat​​eralAddress））{
+        的errorMessage = strprintf（“失败标志广播，VIN：％S ”，VIN的ToString（））;
+        LogPrintf ( " CActiveMasternode::Register() - %s \n " , errorMessage);
+        返回 假；
+    }
+    管理人。mapSeenMasternodeBroadcast。插入（make_pair（MNB。GetHash（），MNB））;
+    主节点同步。AddedMasternodeList（MNB。GetHash（））;
+
+    CMasternode* pmn = mnodeman. 查找(vin);
+    如果（下午== NULL）{
+        CMasternode mn (mnb);
+        管理人。添加（百万）；
+    }其他{
+        pmn-> UpdateFromNewBroadcast (mnb);
+    }
+
+    //发送给所有节点
+    LogPrintf（“ CActiveMasternode ::寄存器（） - RelayElectionEntry VIN =％S \ n ”，VIN。的ToString（））;
+    mnb。继电器();
+
+    返回 真；
+}
+
+bool  CActiveMasternode::GetMasterNodeVin (CTxIn& vin, CPubKey& pubkey, CKey&secretKey)
+{
+    返回 GetMasterNodeVin (vin, pubkey, secretKey, " " , " " );
+}
+
+bool  CActiveMasternode::GetMasterNodeVin (CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex)
+{
+    //寻找可能的候选人
+    TRY_LOCK (pwalletMain-> cs_wallet , fWallet );
+    if (! fWallet )返回 false；
+
+    vector<COutput> possibleCoins = SelectCoinsMasternode ();
+    COutput* selectedOutput;
+
+    //找到 vin
+    如果（！strTxHash。空（））{
+        //让我们找到它
+        uint256 txHash (strTxHash);
+        int输出索引；
+        试试{
+            outputIndex =标准:: Stoi旅馆（strOutputIndex。c_str（））;
+        } catch ( const std:: exception & e) {
+            LogPrintf ( " %s: %s on strOutputIndex \n " , __func__, e. what ());
+            返回 假；
+        }
+
+        找到布尔值=假；
+        BOOST_FOREACH (COutput & out, possibleCoins) {
+            如果（下。TX - > GetHash。（）== txHash &&出我== outputIndex）{
+                selectedOutput = &out;
+                发现 =真;
+                打破;
+            }
+        }
+        如果（！找到）{
+            LogPrintf ( " CActiveMasternode::GetMasterNodeVin - 找不到有效的 vin \n " );
+            返回 假；
+        }
+    }其他{
+        //没有指定输出，选择第一个
+        如果（possibleCoins。大小（）> 0）{
+            selectedOutput = &possibleCoins[ 0 ];
+        }其他{
+            LogPrintf ( " CActiveMasternode::GetMasterNodeVin - 无法从可能的列表中找到指定的 vin \n " );
+            返回 假；
+        }
+    }
+
+    //此时我们有一个选中的输出，检索相关信息
+    返回 GetVinFromOutput (*selectedOutput, vin, pubkey, secretKey);
+}
+
+
+//从输出中提取主节点 vin 信息
+bool  CActiveMasternode::GetVinFromOutput (COutput out, CTxIn& vin, CPubKey& pubkey, CKey&secretKey)
+{
+    CScript pubScript;
+
+    VIN = CTxIn（下。TX - > GetHash（），进行。我）;
+    pubScript = 出。tx -> vout [out. 我]。脚本公钥；//输入公钥
+
+    CTx目的地址1；
+    ExtractDestination (pubScript, address1);
+    CBitcoinAddress address2 (address1);
+
+    CKeyID keyID;
+    如果（！地址2。GetKeyID（KEYID））{
+        LogPrintf ( " CActiveMasternode::GetMasterNodeVin - 地址未引用密钥\n " );
+        返回 假；
+    }
+
+    if (!pwalletMain-> GetKey (keyID, secretKey)) {
+        LogPrintf ( " CActiveMasternode::GetMasterNodeVin - 地址的私钥未知\n " );
+        返回 假；
+    }
+
+    公钥 = 密钥。获取公钥();
+    返回 真；
+}
+
+//获取运行主节点的所有可能输出
+vector<COutput> CActiveMasternode::SelectCoinsMasternode ()
+{
+    vector<COutput> vCoins;
+    vector<COutput> 过滤币；
+    矢量<COutPoint> confLockedCoins;
+
+    //从masternode.conf临时解锁MN币
+    如果（GetBoolArg（“- mnconflock ”，真））{
+        uint256 mnTxHash;
+        BOOST_FOREACH (CMasternodeConfig::CMasternodeEntry mne, masternodeConfig.getEntries ()) {
+            mnTxHash。SetHex（MNE。getTxHash（））;
+
+            int nIndex;
+            如果（！跨国公司。castOutputIndex（参数nIndex））
+                继续;
+
+            COutPoint outpoint = COutPoint (mnTxHash, nIndex);
+            confLockedCoins。push_back (outpoint);
+            pwalletMain-> UnlockCoin (outpoint);
+        }
+    }
+
+    //检索所有可能的输出
+    pwalletMain-> AvailableCoins (vCoins);
+
+    //如果临时解锁，则从 masternode.conf 中锁定 MN 币
+    如果（！confLockedCoins。空（））{
+        BOOST_FOREACH (COutPoint outpoint, confLockedCoins)
+            pwalletMain-> LockCoin (outpoint);
+    }
+
+    //过滤器
+    BOOST_FOREACH ( const COutput& out, vCoins) {
+        如果（下。TX - > VOUT [出来。我]。n值== MASTERNODE_COLLATERAL * COIN）{ //恰好
+            过滤硬币。push_back（出）；
+        }
+    }
+    返回filteredCoins；
+}
+
+//当启动一个主节点时，这可以作为一个没有资金的热钱包运行
+bool  CActiveMasternode::EnableHotColdMasterNode (CTxIn& newVin, CService& newService)
+{
+    如果（！fMasterNode）返回 false；
+
+    状态 = ACTIVE_MASTERNODE_STARTED;
+
+    //需要以下值来签署 mnping 消息
+    vin = newVin;
+    服务 = 新服务；
+
+    LogPrintf ( " CActiveMasternode::EnableHotColdMasterNode() - 已启用！您可以关闭冷守护进程。\n " );
+
+    返回 真；
+}
